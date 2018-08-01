@@ -1,0 +1,95 @@
+require 'xcodeproj'
+
+def write_header(file, file_name, app_name, date)
+  file.write("//\n")
+  file.write("//  " + file_name + "\n")
+  file.write("//  " + app_name + "\n")
+  file.write("//\n")
+  file.write("//  Created by a pretty nifty Ruby script on " + date + ".\n")
+  file.write("//  Copyright © " + date.split('/').last + " Degordian. All rights reserved.\n")
+  file.write("//\n\n")
+end
+
+def write_view_model(file, screen_name)
+  file.write("import Foundation\n\n\n")
+  file.write("class " + screen_name + "ViewModel: BaseViewModel {\n\n")
+  file.write("\tvar navigationService: NavigationService!\n")
+  file.write("\tvar networking: AlamofireNetworking!\n\n")
+  file.write("\trequired init() {}\n\n\n")
+  file.write("}")
+end
+
+def write_view_controller(file, screen_name)
+  file.write("import Foundation\n")
+  file.write("import UIKit\n\n\n")
+  file.write("class " + screen_name + "ViewController: BaseViewController {\n\n")
+  file.write("\tvar viewModel: " + screen_name + "ViewModel! {\n")
+  file.write("\t\treturn baseViewModel as! " + screen_name + "ViewModel\n")
+  file.write("\t}\n")
+  file.write("\tvar presenter: " + screen_name + "Presenter! {\n")
+  file.write("\t\treturn basePresenter as! " + screen_name + "Presenter\n")
+  file.write("\t}\n\n")
+  file.write("\toverride func viewDidLoad() {\n")
+  file.write("\t\tsuper.viewDidLoad()\n")
+  file.write("\t}\n\n")
+  file.write("}")
+end
+
+def write_presenter(file, screen_name)
+  file.write("import Foundation\n")
+  file.write("import UIKit\n\n\n")
+  file.write("class " + screen_name + "Presenter: BasePresenter {\n\n")
+  file.write("\tweak var baseViewController: BaseViewController!\n")
+  file.write("\tweak var viewController: " + screen_name + "ViewController! {\n")
+  file.write("\t\treturn baseViewController as! " + screen_name + "ViewController\n")
+  file.write("\t}\n\n")
+  file.write("\trequired init() {}\n\n\n")
+  file.write("}")
+end
+
+unless ARGV.count >= 2
+  puts "Error: invalid number of arguments"
+  puts "Usage: MVVM $folder_path $screen_name"
+  exit
+end
+
+input_path = ARGV[0]
+path_components = input_path.split('/')
+app_name = path_components.first
+project_path = app_name + '.xcodeproj'
+screen_name = ARGV[1]
+
+project = Xcodeproj::Project.open(project_path)
+root_group = project.groups.first
+desired_group = root_group
+path_components.drop(1).each { |path| desired_group = desired_group.find_subpath(path, true) }
+target = project.targets.first
+
+file_extension = '.swift'
+file_suffixes = ['ViewModel', 'ViewController', 'Presenter']
+
+file_suffixes.each { |suffix|
+  puts "Generating " + suffix + "..."
+
+  filepath = File.expand_path(input_path + '/' + screen_name + suffix + file_extension)
+  file = File.open(filepath, 'w')
+
+  write_header(file, screen_name + suffix, app_name, '21/07/2018')
+  case suffix
+  when file_suffixes[0]
+    write_view_model(file, screen_name)
+  when file_suffixes[1]
+    write_view_controller(file, screen_name)
+  when file_suffixes[2]
+    write_presenter(file, screen_name)
+  end
+
+  file.close
+
+  file_ref = desired_group.new_file(filepath)
+  target.add_file_references([file_ref])
+}
+
+project.save
+
+puts "Done! 🔥🔥🔥"
